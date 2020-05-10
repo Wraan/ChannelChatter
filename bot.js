@@ -6,13 +6,14 @@ const request = require('request');
 const client = new Discord.Client();
 
 client.on('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-});
+    console.log('ChannelChatter is working!')
+})
 
 client.on('message', msg => {
     let authorPrefix = `[**` + msg.author.username + `**]: `;
 
-    if(msg.author.username == client.user.username) { return; }
+    if(msg.author.username === client.user.username) return;
+    if(msg.channel.type !== "dm") return;
 
     let attachment = msg.attachments.first();
     if(attachment) {
@@ -23,7 +24,14 @@ client.on('message', msg => {
         //callback - send image right after download is finished and then delete it
         let picStream = fs.createWriteStream(tempPath);
         picStream.on('close', function() {
-            msg.reply(authorPrefix + msg.content, {files: [tempPath]});
+            //TODO check if presence is null
+            let channelMembers = msg.author.presence.member.voice.channel.members;
+            channelMembers.forEach((member) => {
+                if(member.user.bot) return;
+            
+                member.user.createDM();
+                member.user.send(authorPrefix + msg.content, {files: [tempPath]});
+            });
             
             setTimeout(function() {
                 fs.unlinkSync(tempPath);
@@ -32,7 +40,14 @@ client.on('message', msg => {
 
         downloadImage(attachment.proxyURL, picStream)
     } else {
-        msg.reply(authorPrefix + msg.content);
+        let channelMembers = msg.author.presence.member.voice.channel.members;
+        channelMembers.forEach((member) => {
+            if(member.user.bot) return;
+            
+            member.user.createDM();
+            member.user.send(authorPrefix + msg.content);
+        });
+
     }
 });
 
