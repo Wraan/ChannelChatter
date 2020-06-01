@@ -27,27 +27,33 @@ client.on('message', msg => {
 
 
     const authorPrefix = `[**` + authorUsername + `**]: `;
-    const attachment = msg.attachments.first();
+    const attachments = msg.attachments;
     const content = authorPrefix + msg.content
 
     let channelMembers = msg.author.presence.member.voice.channel.members;
     removeAuthorFromChannelList(authorUsername, channelMembers);
 
-    if(attachment) {
-        const randomName = generateRandomString(32);
-        const tempPath = `./temp/${randomName}.png`;
-        
-        //callback - send image right after download is finished and then delete it
-        const picStream = fs.createWriteStream(tempPath);
-        picStream.on('close', function() {
-            sendMessageToVoiceChannel(channelMembers, content, tempPath);
+    if (attachments) {
+        // first send the message, then attachments
+        sendMessageToVoiceChannel(channelMembers, content);
 
-            setTimeout(function() {
-                fs.unlinkSync(tempPath);
-            }, 10000); //10 seconds 
+        attachments.forEach(attachment => {
+            const randomName = generateRandomString(32);
+            const tempPath = `./temp/${randomName}.png`;
+
+            //callback - send image right after download is finished and then delete it
+            const picStream = fs.createWriteStream(tempPath);
+            picStream.on('close', function() {
+                // content if empty, because the sender is mentioned in the message above
+                sendMessageToVoiceChannel(channelMembers, '', tempPath);
+
+                setTimeout(function() {
+                    fs.unlinkSync(tempPath);
+                }, 10000); //10 seconds
+            });
+
+            downloadImage(attachment.proxyURL, picStream);
         });
-
-        downloadImage(attachment.proxyURL, picStream);
     } else {
         sendMessageToVoiceChannel(channelMembers, content);
     }
