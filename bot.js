@@ -35,7 +35,7 @@ client.on('message', msg => {
 
     if (attachments) {
         // first send the message, then attachments
-        sendMessageToVoiceChannel(channelMembers, content);
+        sendMessageToVoiceChannel(channelMembers, content, null, msg);
 
         attachments.forEach(attachment => {
             const randomName = generateRandomString(32);
@@ -45,7 +45,7 @@ client.on('message', msg => {
             const picStream = fs.createWriteStream(tempPath);
             picStream.on('close', function() {
                 // content if empty, because the sender is mentioned in the message above
-                sendMessageToVoiceChannel(channelMembers, '', tempPath);
+                sendMessageToVoiceChannel(channelMembers, '', tempPath, msg);
 
                 setTimeout(function() {
                     fs.unlinkSync(tempPath);
@@ -55,7 +55,7 @@ client.on('message', msg => {
             downloadImage(attachment.proxyURL, picStream);
         });
     } else {
-        sendMessageToVoiceChannel(channelMembers, content);
+        sendMessageToVoiceChannel(channelMembers, content, null, msg);
     }
 });
 
@@ -123,15 +123,34 @@ function generateRandomString(length){
      return result;
 }
 
-function sendMessageToVoiceChannel(members, content, filePath){
+function sendMessageToVoiceChannel(members, content, filePath, senderMessage){
     members.forEach((member) => {
         if(member.user.bot) return;
-        
-        member.user.createDM();
-        if(filePath)
-            member.user.send(content, {files: [filePath]});
-        else
-            member.user.send(content); 
+
+        try {
+            member.user.createDM().then(() => {
+                const filter = () => true;
+                if(filePath)
+                    member.user.send(content, {files: [filePath]})
+                    .then((message) => {
+                        let collector = message.createReactionCollector(filter, {time: 6000000});
+                        collector.on('collect', reaction => senderMessage.react(reaction.emoji.name));
+                    });
+                else {
+                    member.user.send(content).then((message) => {
+                        let collector = message.createReactionCollector(filter, {time: 6000000});
+                        collector.on('collect', reaction => senderMessage.react(reaction.emoji.name));
+                    });
+                }
+            })
+                .catch(error => {
+                    console.log(error.message);
+                });
+        }
+        catch (exception) {
+            console.log(exception);
+        }
+
     });
 }
 
